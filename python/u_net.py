@@ -9,11 +9,11 @@ N_interior_chan = 40
 N_labels = 22
 
 class Net(nn.Module):
-    def __init__(self, net_name, seg_net = None):
+    def __init__(self, net_name, clf_net = None):
         super(Net, self).__init__()
 
         self.name = net_name
-        self.seg_net = seg_net
+        self.clf_net = clf_net
 
         #convolution - real map
         self.conv1_r = torch.nn.Conv3d(N_map_chan,N_int_map,4, padding = 0).float()
@@ -76,7 +76,7 @@ class Net(nn.Module):
         #LENGTH - 5
 
         #convultion of real with segmentation
-        xs_0 = self.seg_net(x)
+        xs_0 = self.clf_net(x)
         x_all = torch.cat((xs_0,x_r),1)
 
         #LENGTH - 5 
@@ -114,7 +114,7 @@ class Net(nn.Module):
         return out
 
     def calc_true_false_label(self, x, y_true):
-        y = self.seg_net(x)
+        y = self.clf_net(x)
         _, y_pred =  torch.max(y.data, 1)
 
         in_true  = y_true==y_pred
