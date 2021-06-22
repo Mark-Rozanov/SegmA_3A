@@ -21,5 +21,4 @@ cd python
 Segmentation on CPU 
 
 ```bash
-python3.7   ../example/input_map.npy ../data/seg_net.pth ../data/cnf.pth ../example/out_seg.npy ../example/out_cnf.npy
-```
+python3.8 run_map_seg.py ../example/input_map.npy ../data/seg_net.pth ../data/cnf_net.pth ../example/out_seg.npy ../example/out_cnf.npy```
