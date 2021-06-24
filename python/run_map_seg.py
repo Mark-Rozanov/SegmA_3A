@@ -182,7 +182,6 @@ if __name__ == '__main__':
     
     #load and normalize map
     map_file_no_norm = np.load(input_npy_file)
-    map_file_no_norm = np.pad(map_file_no_norm,((pad,pad),(pad,pad),(pad,pad)),'constant', constant_values=0)
     # Run SEG-NET
     segm_map_pred_4D = calc_preds(seg_net, device, map_file_no_norm, Lin=LIN, Lout=LOUT)
     print("DEBUG 2131", segm_map_pred_4D.shape)
