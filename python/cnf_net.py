@@ -2,7 +2,6 @@
 import torch
 import layers3D
 from layers3D import layer3D
-import dbloader
 import torch.nn as nn
 import torch.nn.functional as F
 import Klein4 
@@ -87,16 +86,4 @@ class Net(nn.Module):
         x = self.sftmx6(x)
 
         return x
-    def test_map(self, input3Dmap, Lin = None, Lout = None):
-        map_5D = input3Dmap.unsqueeze(0).unsqueeze(0)
 
-        map_out_5D = self.forward(map_5D)
-
-        _, labels_out_4D = torch.max(map_out_5D.data, 1)
-
-        labels_out_3D = torch.squeeze(labels_out_4D)
-        P =  (Lin-Lout)//2
-
-        labels_out = torch.nn.functional.pad(labels_out_3D, (P,P,P,P,P,P), mode='constant', value=0)
-
-        return labels_out
