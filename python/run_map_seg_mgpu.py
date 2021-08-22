@@ -23,6 +23,9 @@ SIGMA = (STD_MIN+STD_MAX)/2
 
 BATCH_SIZE = 16
 
+BATCH_SIZE_GPU = 6
+
+
 
 def normalize_3D_box(bx, mean=0, sigma = 1):
     bx_var = np.std(bx)
@@ -85,32 +88,34 @@ def maps_to_submaps_4D(inp_map, Lin=None, Lout=None):
                 submaps_dict_4D[(in_x,in_y,in_z)] = submap_4D
     return submaps_dict_4D
 
-def calc_preds(net_nn, device, input_map_not_padded_3D, Lin=None, Lout=None):
+def calc_preds_mgpu(net_replicas, device_ids, input_map_not_padded_3D, Lin=None, Lout=None):
     input_map_3D = np.pad(input_map_not_padded_3D,((pad,pad),(pad,pad),(pad,pad)),'constant', constant_values=0)
     out_preds_pad_4D = np.zeros((N_LABELS, input_map_3D.shape[0],input_map_3D.shape[1], input_map_3D.shape[2]))
 
     submaps_dict = maps_to_submaps(input_map_3D, out_preds_pad_4D, Lin=Lin, Lout=Lout)
-    xx_5D_numpy = np.zeros((BATCH_SIZE,1,LIN,LIN,LIN))
-    ky_batch  = [None]*BATCH_SIZE
+    batch_size = BATCH_SIZE_GPU*len(device_ids)
+    xx_5D_numpy = np.zeros((batch_size,1,LIN,LIN,LIN))
+    ky_batch  = [None]*batch_size
 
 
-    print("DEBUG")
-    device_ids = [0,1,2,3]
-    net_replicas = torch.nn.parallel.replicate(net_nn, device_ids)
-    net_replicas = net_replicas[:len(device_ids)]
+
+    for nn in net_replicas:
+        print(type(nn))
+
 
     for in_key, ky in enumerate(list(submaps_dict.keys())):
-        num_in_batch = in_key%BATCH_SIZE
+        num_in_batch = in_key%batch_size
         xx_5D_numpy[num_in_batch,0,:,:,:] = submaps_dict[ky]['em_map']
         ky_batch[num_in_batch] = ky
 
 
-        if in_key%BATCH_SIZE!=(BATCH_SIZE-1) and in_key != (len(list(submaps_dict.keys()))-1):
+        if in_key%batch_size!=(batch_size-1) and in_key != (len(list(submaps_dict.keys()))-1):
             continue
 
         xx_5D_cpu  = torch.tensor(xx_5D_numpy).float().to("cpu")
         x_5D_scattered  = torch.nn.parallel.scatter(xx_5D_cpu, device_ids)
-        print(net_replicas)
+
+
         outputs_scattered = torch.nn.parallel.parallel_apply(net_replicas, x_5D_scattered)
         outputs_5D_cpu = torch.nn.parallel.gather(outputs_scattered, 'cpu')
         
@@ -124,7 +129,7 @@ def calc_preds(net_nn, device, input_map_not_padded_3D, Lin=None, Lout=None):
             out_preds_pad_4D[:,in_x:in_x+Lout ,in_y:in_y+Lout,in_z:in_z+Lout] = out_pred_pad_batch_5D[in_entry,:,:,:,:]
         
         print(in_key, len(list(submaps_dict.keys())), time.ctime())
-        ky_batch  = [None]*BATCH_SIZE
+        ky_batch  = [None]*batch_size
 
     Lin = np.int(Lin)
     out_preds_pad_4D = out_preds_pad_4D[:,pad:-pad,pad:-pad,pad:-pad]
@@ -197,22 +202,28 @@ if __name__ == '__main__':
     seg_out_file = sys.argv[4]
     cnf_out_file = sys.argv[5]
 
-    ## load nets
-    clf_net = eq_net_T4.Net("CLF NET T4")
-    seg_net = u_net.Net('Segment_Net', clf_net=clf_net)
-    seg_net.load_state_dict(torch.load(seg_net_weights_file, map_location = device))
-    if torch.cuda.device_count()>10:
-        clf_net = torch.nn.DataParallel(clf_net, device_ids = [0,1,2,3])
+    
+    devices_4 = [0,1,2,3]
+    seg_net_replicas = []
+    print("DEVICES", devices_4)
+    for d in devices_4:
+            ## load nets
+        clf_net = eq_net_T4.Net("CLF NET T4")
+        seg_net = u_net.Net('Segment_Net', clf_net=clf_net)
+        seg_net.load_state_dict(torch.load(seg_net_weights_file, map_location = "cpu"))
+        d_net = "cuda:{}".format(d)
 
-    clf_net.to(device)
-    seg_net.to(device)
-    seg_net.eval()
+        clf_net.to(d_net)
+        seg_net.to(d_net)
+        seg_net.eval()
+        seg_net_replicas.append(seg_net)
+
     cnf_net = cnf_net.Net("CNF KLein4")
     cnf_net.load_state_dict(torch.load(cnf_net_weights_file, map_location = device))
     
     #load and normalize map
     map_file_no_norm = np.load(input_npy_file)
-    segm_map_pred_4D = calc_preds(seg_net, device, map_file_no_norm, Lin=LIN, Lout=LOUT)
+    segm_map_pred_4D = calc_preds_mgpu(seg_net_replicas, devices_4, map_file_no_norm, Lin=LIN, Lout=LOUT)
     cnf_map_pred_4D,_=  calc_confidence(map_file_no_norm, segm_map_pred_4D, cnf_net, device)
 
     segm_map_labels_3D = np.argmax(segm_map_pred_4D, axis=0)
