@@ -52,8 +52,7 @@ class Net(nn.Module):
         self.bn6  = BN_group(22)
         self.elu6 = nn.LeakyReLU()
 
-        self.sftmx6 = nn.LogSoftmax(dim=1)
-
+        self.sftmx6 = nn.Softmax(dim=1)
 
         
     def forward(self, x):
@@ -83,9 +82,10 @@ class Net(nn.Module):
         x = self.elu6(x)
 
         x = torch.max(x,2)[0] 
-        x = self.sftmx6(x)
+        y_out = self.sftmx6(x)
 
-        return x
+        return y_out
+        
     def test_map(self, input3Dmap, Lin = None, Lout = None):
         map_5D = input3Dmap.unsqueeze(0).unsqueeze(0)
 

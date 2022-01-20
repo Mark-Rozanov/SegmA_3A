@@ -3,29 +3,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-def next_iteraion_lists(train_loss, cand_loss, new_train_file, new_cand_file , thr):
 
-    if train_loss ==None:
-        all_files = cand_loss["f_name"]
-        all_losses = cand_loss["loss"].tolist()
-    else:
-        all_files = train_loss["f_name"]+cand_loss["f_name"]
-        all_losses = train_loss["loss"].tolist()+cand_loss["loss"].tolist()
-
-    f_cand = open(new_cand_file,"w")
-    f_train = open(new_train_file,"w")
-
-    for in_file, loss in enumerate(all_losses):
-        if loss < thr:
-            f_train.write(all_files[in_file])
-            f_train.write("\n")
-        else: 
-            f_cand.write(all_files[in_file])
-            f_cand.write("\n")
-    f_cand.close()
-    f_train.close()
-
-    return
 
 def read_header_line(ln):
 
@@ -77,14 +55,14 @@ def plot_loss(ax,list_file, x_pos, crop_vals, clr):
     plt.axes(ax)
 
     loss_dict = load_res_file(list_file)
-    loss_dict["loss"] = np.clip(loss_dict["loss"], crop_vals[0], crop_vals[1])
+    loss_dict["loss"] = np.clip(np.exp(loss_dict["loss"]), crop_vals[0], crop_vals[1])
     pc = plt.violinplot(dataset = loss_dict["loss"], positions = [x_pos] ,showmeans = False,showmedians=False,showextrema=False,widths=1.5)
     pc["bodies"][0].set_facecolor(clr)
     pc["bodies"][0].set_edgecolor(clr)
     plt.boxplot(loss_dict["loss"],positions = [x_pos] ,vert=True,showfliers=False,showcaps=False,notch=True)
     N_p = len(loss_dict["loss"])
-    plt.text(x_pos,crop_vals[0]-1,str(N_p),va='center',fontsize = 12)
-    plt.ylim(crop_vals[0]-2,crop_vals[1]+2)
+    plt.text(x_pos,crop_vals[0]-0.02,str(N_p),va='center',fontsize = 12)
+    plt.ylim(crop_vals[0]-2,crop_vals[1]+0.5)
     return
 
 def plot_resolutions(ax,list_file, x_pos,  clr):
@@ -276,5 +254,5 @@ def analysis_320():
 
     return
 
-analysis_320()
+#analysis_320()
 ## CREATE NEW FILES

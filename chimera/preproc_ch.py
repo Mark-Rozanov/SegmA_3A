@@ -13,7 +13,7 @@ label_dict = {"ALA":1,"ARG":2,"ASN":3,"ASP":4,"CYS":5,"CYH":5,"CYD":5,\
 "SER":16,"THR":17,"TRP":18,"TYR":19,"VAL":20,"NONE":0, "A":21,\
 "C":21,"U":21,"G":21, "DA":21,"DC":21,"DU":21,"DG":21,"DU":21}
 
-VX_SIZE=1 
+VX_SIZE=1
 RES = 3.0
 
 def calc_voxalization_by_res_type(pdb_id,grid3D,res=3.0 , resTypes = []):
@@ -25,7 +25,7 @@ def calc_voxalization_by_res_type(pdb_id,grid3D,res=3.0 , resTypes = []):
     ##loop on atoms
     for r_name in resTypes:
         # selection
-        try: 
+        try:
             runCommand('molmap #{}:{} {}  modelId {}'.\
                 format(pdb_id,r_name,res,Id_for_molmap))
         except CommandError as e:
@@ -33,7 +33,7 @@ def calc_voxalization_by_res_type(pdb_id,grid3D,res=3.0 , resTypes = []):
             runCommand('vop new zero_map origin {},{},{} modelId {}'.\
                     format(np.mean(grid3D[0]),np.mean(grid3D[1]),np.mean(grid3D[1]),Id_for_molmap))
 
-                
+
 
         #extract matrix (copy?)
         res_map[r_name]=map_to_matrix(Id_for_molmap,grid3D)
@@ -97,6 +97,8 @@ def calc_3D_grid_from_pdb(pdb_id,vx_size,margin):
     return (Xs,Ys,Zs)
 
 
+
+
 def calc_all_matrices(pdb_file=None, map_file=None,vx_size = None, res = None, resTypesDict = None):
 
     map_obj = open_volume_file(map_file)[0]
@@ -120,28 +122,36 @@ def calc_all_matrices(pdb_file=None, map_file=None,vx_size = None, res = None, r
             seg_matrix[resTypesDict[rs],:,:,:] = np.maximum(seg_matrix[resTypesDict[rs],:,:,:], res_mtrc[rs])
         label_mtrx = np.argmax(seg_matrix, axis=0)
 
+        dist_mtrx = seg_matrix
 
     else:
         grid3D = calc_3D_grid_from_map(map_id,vx_size,margin)
         em_mtrx = map_to_matrix(map_id,grid3D)
         label_mtrx = None
+        dist_mtrx = None
 
-    return em_mtrx, label_mtrx
+    return em_mtrx, label_mtrx, dist_mtrx
 
 
 if __name__ == "chimeraOpenSandbox":
+
 
     if len(sys.argv)==5:
         ref_pdb_file=None
         map_file=sys.argv[3]
         out_image_file=sys.argv[4]
-        em_mtrx, label_mtrx = calc_all_matrices(ref_pdb_file, map_file,vx_size = VX_SIZE, res = RES, resTypesDict = label_dict)
+        em_mtrx, label_mtrx, dist_mtrx = calc_all_matrices(ref_pdb_file, map_file,vx_size = VX_SIZE, res = RES, resTypesDict = label_dict)
         np.save(out_image_file, em_mtrx)
-    #    np.save(out_labels_file, label_mtrx)
+    elif len(sys.argv)==8       :
+        map_file=sys.argv[3]
+        ref_pdb_file=sys.argv[4]
+        out_image_file=sys.argv[5]
+        out_true_file=sys.argv[6]
+        out_dist_file=sys.argv[7]
+
+        em_mtrx, label_mtrx, dist_mtrx = calc_all_matrices(ref_pdb_file, map_file,vx_size = VX_SIZE, res = RES, resTypesDict = label_dict)
+        np.save(out_image_file, em_mtrx)
+        np.save(out_true_file, label_mtrx)
+        np.save(out_dist_file, dist_mtrx)
 
     runCommand('stop')
-
-
-
-
-

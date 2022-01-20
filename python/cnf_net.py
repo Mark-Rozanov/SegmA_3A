@@ -1,16 +1,22 @@
-
 import torch
-import layers3D
-from layers3D import layer3D
+import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
-import Klein4 
-layers = layer3D(Klein4) # The layers is instantiated with the group structure as input
+import K4_group 
+from layers3D import layer3D
+
+layers = layer3D(K4_group) # The layers is instantiated with the group structure as input
+
+N_map_chan = 1
+N_seg_chan = 22
+N_int_map = 5
+N_interior_chan = 10
+N_labels = 2
 
 class BN_group(nn.Module):
     def __init__(self, Nout):
         torch.nn.Module.__init__(self)
-        self.C = Nout*4
+        self.C = Nout*len(layers.H.rots)
         self.bn = nn.BatchNorm3d(self.C)
     def forward(self, x):
         shape_in = x.shape
@@ -19,71 +25,131 @@ class BN_group(nn.Module):
         x = self.bn(x)
         x = torch.reshape(x, shape_in)
         return x
-        
 
 class Net(nn.Module):
-    def __init__(self, net_name):
+    def __init__(self, net_name, seg_nn = None):
         super(Net, self).__init__()
-        
+
+        self.Lin = 15
+        self.seg_nn = seg_nn
         self.name = net_name
+        self.Lout = self.Lin
+
+        #convolution - real map
+        self.conv1g_r = layers.ConvRnG(N_map_chan,N_int_map,4, padding = 0).float()
+        self.bn1_r  = BN_group(N_int_map)
+        self.elu1_r = nn.LeakyReLU()
+        self.Lout = self.Lout-4+1
         
-        self.conv1g = layers.ConvRnG(23,22,3, padding = 0).float()
-        self.bn1  = BN_group(22)
-        self.elu1 = nn.LeakyReLU()
+        self.conv2g_r = layers.ConvGG(N_int_map,N_int_map,4, padding = 0).float()
+        self.bn2_r  = BN_group(N_int_map)
+        self.elu2_r = nn.LeakyReLU()
+        self.Lout = self.Lout-4+1
+
+        self.conv3g_r = layers.ConvGG(N_int_map,N_int_map,5, padding = 0).float()
+        self.bn3_r  = BN_group(N_int_map)
+        self.elu3_r = nn.LeakyReLU()
+        self.Lout = self.Lout-5+1
+
+        #convolution all
+        self.conv4g_r = layers.ConvRnG(N_int_map+N_seg_chan,N_interior_chan,3, padding = 0).float()
+        self.bn4_r  = BN_group(N_interior_chan)
+        self.elu4_r = nn.LeakyReLU()
+        self.Lout = self.Lout-3+1
+
+        self.conv5g_r = layers.ConvGG(N_interior_chan,N_interior_chan,2, padding = 0).float()
+        self.bn5_r  = BN_group(N_interior_chan)
+        self.elu5_r = nn.LeakyReLU()
+        self.Lout = self.Lout-2+1
+
+        self.conv6g_r = layers.ConvGG(N_interior_chan,N_interior_chan,2, padding = 0).float()
+        self.bn6_r  = BN_group(N_interior_chan)
+        self.elu6_r = nn.LeakyReLU()
+        self.Lout = self.Lout-2+1
+
+
+        #deconvolution - segmented
+        self.de_conv1 = torch.nn.ConvTranspose3d(N_interior_chan,N_interior_chan,2, padding = 0).float()
+        self.bn_d1  = nn.BatchNorm3d(N_interior_chan)
+        self.elu_d1 = nn.LeakyReLU()
+        self.Lout = self.Lout+2-1
         
-        self.conv2g = layers.ConvGG(22,22,3, padding = 0).float()
-        self.bn2  = BN_group(22)
-        self.elu2 = nn.LeakyReLU()
+        self.de_conv2 = torch.nn.ConvTranspose3d(N_interior_chan+N_interior_chan,N_interior_chan,2, padding = 0).float()
+        self.bn_d2  = nn.BatchNorm3d(N_interior_chan)
+        self.elu_d2 = nn.LeakyReLU()
+        self.Lout = self.Lout+2-1
 
-        self.conv3g = layers.ConvGG(22,22,2, padding = 0).float()
-        self.bn3  = BN_group(22)
-        self.elu3 = nn.LeakyReLU()
+        self.de_conv3 = torch.nn.ConvTranspose3d(N_interior_chan+N_interior_chan,N_labels,3, padding = 0).float()
+        self.bn_d3  = nn.BatchNorm3d(N_labels)
+        self.elu_d3 = nn.LeakyReLU()
+        self.Lout = self.Lout+3-1
 
-        self.conv4g = layers.ConvGG(22,22,2, padding = 0).float()
-        self.bn4  = BN_group(22)
-        self.elu4 = nn.LeakyReLU()
+        self.sftmx_cnf = nn.Softmax(dim=1)
 
-        self.conv5g = layers.ConvGG(22,22,3, padding = 0).float()
-        self.bn5  = BN_group(22)
-        self.elu5 = nn.LeakyReLU()
-
-
-        self.conv6g = layers.ConvGG(22,2,3, padding = 0).float()
-        self.bn6  = BN_group(2)
-        self.elu6 = nn.LeakyReLU()
-
-        self.sftmx6 = nn.LogSoftmax(dim=1)
-
-
-        
     def forward(self, x):
+        #convolution of real map
+        #INITIAL LENGTH - 15
+        x_r = self.conv1g_r(x)
+        x_r = self.bn1_r(x_r)
+        x_r = self.elu1_r(x_r)
+        #LENGTH - 12
+        x_r = self.conv2g_r(x_r)
+        x_r = self.bn2_r(x_r)
+        x_r = self.elu2_r(x_r)
+        #LENGTH - 9
+        x_r = self.conv3g_r(x_r) 
+        x_r = self.bn3_r(x_r)
+        x_r = self.elu3_r(x_r)
+        #LENGTH - 5
+        x_r = torch.max(x_r,2)[0] 
 
-        x = self.conv1g(x)
-        x = self.bn1(x)
-        x = self.elu1(x)
+
+        #convultion of real with segmentation
+        with torch.no_grad():
+            x_seg_0, x_clf_0 = self.seg_nn(x)
+        x_all = torch.cat((x_seg_0,x_r),1)
+
+        #LENGTH - 5 
+        x_all1 = self.conv4g_r(x_all)
+        x_all1 = self.bn4_r(x_all1)
+        x_all1 = self.elu4_r(x_all1)
+        x_all1_m = torch.max(x_all1,2)[0] 
+
+        #LENGTH - 3
+        x_all2 = self.conv5g_r(x_all1)
+        x_all2 = self.bn5_r(x_all2)
+        x_all2 = self.elu5_r(x_all2)
+        x_all2_m = torch.max(x_all2,2)[0] 
+
+        #LENGTH - 2
+        x_all3 = self.conv6g_r(x_all2)
+        x_all3 = self.bn6_r(x_all3)
+        x_all3 = self.elu6_r(x_all3)
+        #LENGTH - 1
+        x_all3_m = torch.max(x_all3,2)[0] 
+
+        #deconvolution
+        xd_1 = self.de_conv1(x_all3_m)
+        xd_1 = self.bn_d1(xd_1)
+        xd_1 = self.elu_d1(xd_1)
+        #LENGTH - 2
+        xd_2 = torch.cat((xd_1,x_all2_m),1)
+        xd_2 = self.de_conv2(xd_2)
+        xd_2 = self.bn_d2(xd_2)
+        xd_2 = self.elu_d2(xd_2)
+        #LENGtH - 3
+        xd_3 = torch.cat((xd_2,x_all1_m),1)
+        xd_3 = self.de_conv3(xd_3)
+        xd_3 = self.bn_d3(xd_3)
+        xd_3 = self.elu_d3(xd_3)
+        #LENGTH - 5 
         
-        x = self.conv2g(x)
-        x = self.bn2(x)
-        x = self.elu2(x)
+        cnf_labels = self.sftmx_cnf(xd_3)
+        
+        return cnf_labels, x_seg_0, x_clf_0
 
-        x = self.conv3g(x)
-        x = self.bn3(x)
-        x = self.elu3(x)
-
-        x = self.conv4g(x)
-        x = self.bn4(x)
-        x = self.elu4(x)
-
-        x = self.conv5g(x)
-        x = self.bn5(x)
-        x = self.elu5(x)
-
-        x = self.conv6g(x)
-        x = self.bn6(x)
-        x = self.elu6(x)
-
-        x = torch.max(x,2)[0] 
-        x = self.sftmx6(x)
-
-        return x
-
+    def get_trained_parameters(self):
+        all_params = [x for x in self.parameters()]
+        seg_params = [x for x in self.seg_nn.parameters()]
+        trained_parameters = list(set(all_params)-set(seg_params))
+        return trained_parameters   

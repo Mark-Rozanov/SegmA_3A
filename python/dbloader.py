@@ -17,14 +17,16 @@ import timeit
 import sys
 import csv
 from utils import normalize_3D_box, maps_to_submaps_4D, maps_to_submaps
-
+from utils import element_dict
+import protein_atoms
 try:
     import torch
     from torch.utils.data import Dataset, DataLoader
 except ImportError:
   print("run without TORCH")
-
-
+import re
+from utils import Atom
+import utils
 
 ATOM_NAMES=["C","S","H","N","O"]
 VOX_SIZE = 1.0
@@ -56,58 +58,6 @@ AA_LOUT=AA_LIN - (AA_BoxIn-AA_BoxOut)
 
 
 
-def maps_to_submaps(inp_map, inp_label, Lin=None, Lout=None):
-    Nx,Ny,Nz = inp_map.shape
-    D = (Lin-Lout)//2
-    x = [a for a in range(D,Nx-D,Lout)]
-    y = [a for a in range(D,Ny-D,Lout)]
-    z = [a for a in range(D,Nz-D,Lout)]
-
-    if x[-1]+Lin-D>=Nx-1:
-        del x[-1]
-    if y[-1]+Lin-D>=Ny-1:
-        del y[-1]
-    if z[-1]+Lin-D>=Nz-1:
-        del z[-1]
-
-    submaps_dict_4D = {}
-
-    for in_x in x:
-        for in_y in y:
-            for in_z in z:
-                submap_3D = np.copy(inp_map[in_x-D:in_x+Lin-D, in_y-D:in_y+Lin-D, in_z-D:in_z+Lin-D])
-                sublable_3D = np.copy(inp_label[in_x:in_x+Lout ,in_y:in_y+Lout,in_z:in_z+Lout])
-                sun_norm_3D = normalize_3D_box(submap_3D, mean=MEAN, sigma = SIGMA)
-                sun_norm_exp_4D = np.expand_dims(sun_norm_3D,0)
-                submaps_dict_4D[(in_x,in_y,in_z)] = {"em_map":sun_norm_exp_4D, "label":sublable_3D}
-
-
-    return submaps_dict_4D
-
-def maps_to_submaps_4D(inp_map, Lin=None, Lout=None):
-    Nch, Nx, Ny, Nz = inp_map.shape
-    D = (Lin-Lout)//2
-    x = [a for a in range(D,Nx-D,Lout)]
-    y = [a for a in range(D,Ny-D,Lout)]
-    z = [a for a in range(D,Nz-D,Lout)]
-
-    if x[-1]+Lin-D>=Nx-1:
-        del x[-1]
-    if y[-1]+Lin-D>=Ny-1:
-        del y[-1]
-    if z[-1]+Lin-D>=Nz-1:
-        del z[-1]
-
-    submaps_dict_4D = {}
-
-    for in_x in x:
-        for in_y in y:
-            for in_z in z:
-                submap_4D = np.copy(inp_map[:,in_x-D:in_x+Lin-D, in_y-D:in_y+Lin-D, in_z-D:in_z+Lin-D])
-                submaps_dict_4D[(in_x,in_y,in_z)] = submap_4D
-    return submaps_dict_4D
-
-
 class PATCHES_DATASET(Dataset):
 
     def __init__(self, db_name, list_file):
@@ -136,7 +86,15 @@ class PATCHES_DATASET(Dataset):
         em_map = np.expand_dims(normalized_map,0)
         labels_map = np.load(label_file)
         un_norm_map = inp_map[D:-D,D:-D,D:-D]
+
+        loc_string = re.findall(r'X\d+_Y\d+_Z\d+',map_file)[0]
+
+        x = int(re.findall(r'X\d+',loc_string)[0].strip('X'))
+        y = int(re.findall(r'Y\d+',loc_string)[0].strip('Y'))
+        z = int(re.findall(r'Z\d+',loc_string)[0].strip('Z'))
+
+        #create atoms
         sample ={"em_map": em_map, "label":labels_map, \
-            "file_name": label_file, "un_norm_map":un_norm_map }
+            "file_name": label_file, "un_norm_map":un_norm_map, "corner_pos": (x,y,z)}
         return sample
 

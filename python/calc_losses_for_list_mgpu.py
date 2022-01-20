@@ -1,5 +1,5 @@
 import torch 
-import u_net, eq_net_T4, cnf_net
+import  eq_net_T4
 import time
 import numpy as np
 import sys
@@ -55,7 +55,7 @@ def calc_losses_clf_net(input_list_file,output_list_file,clf_weight_file, header
 
 
     for i_batch, sample_batched in enumerate(test_loader):
-        if i_batch%100 == 0:
+        if i_batch%100== 0:
             print(i_batch*batch_size,"/",len(test_loader)*batch_size, " PATCHES TESTED", time.ctime())
 
 
@@ -63,7 +63,7 @@ def calc_losses_clf_net(input_list_file,output_list_file,clf_weight_file, header
         x_cpu  = sample_batched['em_map'].float().to("cpu")
         x_scattered  = torch.nn.parallel.scatter(x_cpu, device_ids)
         outputs_scattered = torch.nn.parallel.parallel_apply(clf_net_replicas, x_scattered)
-        outputs_cpu = torch.nn.parallel.gather(outputs_scattered, 'cpu')
+        outputs_cpu = torch.nn.parallel.gather(outputs_scattered, device_ids[0]).to('cpu')
 
         with open(output_list_file,"a") as f:
             for i in range(batch_size):
