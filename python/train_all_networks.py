@@ -71,8 +71,8 @@ def trainSEG(train_maps_list,valid_maps_list,root_folder, max_batches = 1000000 
     seg_weights_file = root_folder +"/seg_net.pth"
     clf_weights_file = root_folder +"/clf_net.pth"
 
-#    seg_nn.load_state_dict(torch.load(seg_weights_file))
-#    seg_nn.eval()
+    seg_nn.load_state_dict(torch.load(seg_weights_file))
+    seg_nn.eval()
     clf_nn.load_state_dict(torch.load(clf_weights_file))
     clf_nn.eval()
     seg_nn.to(device_seg)
@@ -91,8 +91,8 @@ def trainSEG(train_maps_list,valid_maps_list,root_folder, max_batches = 1000000 
     seg_writer =  SummaryWriter(log_dir=seg_graphs_folder)
 
     weights_seg = np.ones(22)
-    weights_seg[0] = 0.01
-    weights_seg[21] = 10
+    weights_seg[0] = 0.05
+    weights_seg[21] = 100
 
     weights_tensor_seg = torch.tensor(weights_seg).float().cuda(device_seg)
     crit_seg = torch.nn.CrossEntropyLoss(weight=weights_tensor_seg)
@@ -129,7 +129,7 @@ def trainSEG(train_maps_list,valid_maps_list,root_folder, max_batches = 1000000 
         if n_batch_all== all_batches//4:
             weights_seg = np.ones(22)
             weights_seg[0] = 0.05
-            weights_seg[21] = 10
+            weights_seg[21] = 100
 
             weights_tensor_seg = torch.tensor(weights_seg).float().cuda(device_seg)
             crit_seg = torch.nn.CrossEntropyLoss(weight=weights_tensor_seg)
@@ -275,11 +275,20 @@ def trainCNF(train_maps_list,valid_maps_list,root_folder, max_batches = 1000000 
     clf_nn = eq_net_T4.Net('CLF NET')
     seg_nn = seg_net.Net('Seg Net', clf_net = clf_nn)
 
-    seg_weights_file = root_folder +"/seg_net.pth"
-    seg_nn.load_state_dict(torch.load(seg_weights_file))
-    seg_nn.eval()
+
 
     cnf_nn = cnf_net.Net('CNF Net', seg_nn = seg_nn)
+
+    cnf_weights_file = root_folder +"/cnf_net.pth"
+    if os.path.isfile(cnf_weights_file):
+        cnf_nn.load_state_dict(torch.load(cnf_weights_file))
+        cnf_nn.eval()
+
+    seg_weights_file = root_folder +"/seg_net.pth"
+    if os.path.isfile(seg_weights_file):
+        seg_nn.load_state_dict(torch.load(seg_weights_file))
+        seg_nn.eval()
+
     cnf_nn.to(device)
 
     ### make out folders

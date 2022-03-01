@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import sklearn
 
 AA_dict =  {"BKGRND":0,"ALA":1,"ARG":2,"ASN":3,"ASP":4,"CYS":5,
 "GLN":6,"GLU":7,"GLY":8,"HIS":9,"ILE":10,"LEU":11,"LYS":12,"MET":13,"PHE":14,"PRO":15,
@@ -23,14 +24,14 @@ def calc_detection_matrix(y_out, y_true, N_labels):
     return det_mat
 
 
-def plot_conf_mtrx_heat_map(y_out, y_true, label_names, plot_title, save_file_name, vmin=0, vmax=100):
+def plot_conf_mtrx_heat_map(det_mat, label_names, plot_title, save_file_name, vmin=0, vmax=100):
 
-    det_mat = calc_detection_matrix(y_out, y_true, len(label_names.keys()))
+    #det_mat = calc_detection_matrix(y_out, y_true, len(label_names.keys()))
     det_mat = np.round(det_mat*100).astype(int)
 
     fig, ax = plt.subplots()
     #im = ax.imshow(det_mat, vmin=vmin, vmax=vmax, interpolation = 'nearest')
-    im = ax.pcolor(det_mat, vmin=vmin, vmax=vmax,edgecolors='w')
+    im = ax.pcolor(det_mat, cmap='turbo',vmin=vmin, vmax=vmax,edgecolors='w')
 
     l_names = [None]*len(label_names.keys())
     for ky in label_names.keys():
@@ -49,7 +50,7 @@ def plot_conf_mtrx_heat_map(y_out, y_true, label_names, plot_title, save_file_na
     for i in range(len(l_names)):
         for j in range(len(l_names)):
             text = ax.text(j+0.3, i+0.3, det_mat[i, j],ha="center", va="center", color="k",fontsize=6)
-    
+
     plt.xlabel('True Label')
     plt.ylabel('Predicted Label')
     ax.set_title(plot_title)
@@ -103,18 +104,17 @@ def eulerAnglesToRotationMatrix(theta) :
 
     return R
 
-def CNF_plots(em_map, true_labels, seg_labels, cnf_labels, dist_mtrx, fold_name):
-
+def CNF_plots(true_labels, seg_labels, cnf_labels, dist_mtrx, fold_name):
 
     dist_sec = dist_mtrx.copy()
 
     dv=0.15
-    max_values = np.amax(dist_mtrx,0,keepdims=True)
+    max_values = np.amax(dist_mtrx,1,keepdims=True)
     in_max = dist_mtrx==max_values
     dist_sec[in_max]=-1
 
-    sec_values = np.amax(dist_sec,0)
-    sec_labels = np.argmax(dist_sec,0)
+    sec_values = np.amax(dist_sec,1)
+    sec_labels = np.argmax(dist_sec,1)
     max_values = np.squeeze(max_values)
 
     far_voxels = max_values<0.201
@@ -139,6 +139,10 @@ def CNF_plots(em_map, true_labels, seg_labels, cnf_labels, dist_mtrx, fold_name)
     image_CNF(RES_map["BACK"],'back_grnd',fold_name+'back_grnd_MTRX.png')
     image_CNF(RES_map["BACK_ATM"],'bound_Atoms_Bnkgrnd',fold_name+'bound_Atoms_Bnkgrnd_MTRX.png')
     image_CNF(RES_map["ATM_ATM"],'bound_Atoms_Atoms',fold_name+'bound_Atoms_Atoms_MTRX.png')
+
+    #REG 1
+
+    #fpr_reg_1, tpr_reg_1, thr =   sklearn.metrics.roc_curve(y_true, y_score, pos_label=None, sample_weight=None, drop_intermediate=True)
 
 def image_CNF(RES,ttl,fig_name):
     mtrx =np.array([[ RES["True/Conf"], RES["True/UnConf"]  ],
@@ -500,5 +504,6 @@ def analyse_cnf_layer(conf_labels, seg_labels, seg_true, layer_index):
     RES["False/Conf"]   = np.sum(np.logical_and(in_false_conf,layer_index))/(np.sum(layer_index)+0.001)
     RES["True/UnConf"]  = np.sum(np.logical_and(in_true_unconf,layer_index))/(np.sum(layer_index)+0.001)
     RES["False/UnConf"] = np.sum(np.logical_and(in_false_unconf,layer_index))/(np.sum(layer_index)+0.001)
+
 
     return RES

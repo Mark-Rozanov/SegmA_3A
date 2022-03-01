@@ -33,6 +33,6 @@ if __name__ == '__main__':
     res_folder = map_folder+'/res/'
     if  os.path.exists(res_folder):
         shutil.rmtree(res_folder)
-    os.mkdir(res_folder)
+    os.mkdir(res_folder,mode=777)
 
     tests_segma.run_test_on_whole_map(cnf_nn = cnf_nn, in_map_fold=map_folder, out_map_fold=res_folder,device_id=device)

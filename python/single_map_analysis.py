@@ -9,7 +9,7 @@ import sys
 import os
 import shutil
 from plot_utils import CNF_plots,image_CNF, calc_statistics, plot_prec_recall, plot_map_stat, plot_conf_mtrx_heat_map
-sys.path.append("/home/temp/SegmA_3A/python/plot_utils.py")
+sys.path.append("/home/GIT_CHECK_20_JAN/SegmA_3A/python/plot_utils.py")
 from plot_utils import AA_dict
 
 
@@ -30,7 +30,6 @@ if __name__ == '__main__':
     shutil.rmtree(plots_folder, ignore_errors=True)
     os.mkdir(plots_folder)
 
-
     em_mtrx     = np.load(input_npy_file)
     seg_preds   = np.load(seg_out_file)
     seg_true    = np.load(true_labels)
@@ -48,8 +47,11 @@ if __name__ == '__main__':
     plot_map_stat(em_mtrx=em_mtrx, labels_mtrx=seg_true, seg_mtrx=seg_labels,
      tf_mtrx=conf_labels, plots_folder=plots_folder, thr=map_thr, bin_points=bin_points, n_bin_for_aa_plot=9)
 
-    plot_conf_mtrx_heat_map(seg_labels, seg_true, AA_dict, "All", plots_folder+'/Conf_Matrix_All.png', vmin=0, vmax=100)
+
+    det_seg = calc_detection_matrix(seg_labels, seg_true, len(AA_dict.keys()))
+    plot_conf_mtrx_heat_map(det_seg, AA_dict, "All", plots_folder+'/Conf_Matrix_All.png', vmin=0, vmax=100)
     seg_labels[conf_labels==0] = 22
     seg_true    = seg_true[em_mtrx>map_thr]
     seg_labels    = seg_labels[em_mtrx>map_thr]
-    plot_conf_mtrx_heat_map(seg_labels, seg_true, AA_dict, "Above_THR_With_CONF", plots_folder+'/Above_THR_With_CONF.png', vmin=0, vmax=100)
+    det_seg = calc_detection_matrix(seg_labels, seg_true, len(AA_dict.keys()))
+    plot_conf_mtrx_heat_map(det_seg, AA_dict, "Above_THR_With_CONF", plots_folder+'/Above_THR_With_CONF.png', vmin=0, vmax=100)
