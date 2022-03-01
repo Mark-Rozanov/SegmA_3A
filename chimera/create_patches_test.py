@@ -3,7 +3,8 @@ import chimera
 from chimera import runCommand
 import sys, os, glob, shutil
 import traceback
-sys.path.append("/home/temp/SegmA_3A/python/")
+sys.path.append("/home/GIT_CHECK_20_JAN/SegmA_3A/python/")
+sys.path.append("/home/GIT_CHECK_20_JAN/SegmA_3A/chimera/")
 import MarkChimeraUtils
 from VolumeViewer import open_volume_file
 import time
