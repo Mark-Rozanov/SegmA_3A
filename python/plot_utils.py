@@ -109,12 +109,12 @@ def CNF_plots(true_labels, seg_labels, cnf_labels, dist_mtrx, fold_name):
     dist_sec = dist_mtrx.copy()
 
     dv=0.15
-    max_values = np.amax(dist_mtrx,1,keepdims=True)
+    max_values = np.amax(dist_mtrx,0,keepdims=True)
     in_max = dist_mtrx==max_values
     dist_sec[in_max]=-1
 
-    sec_values = np.amax(dist_sec,1)
-    sec_labels = np.argmax(dist_sec,1)
+    sec_values = np.amax(dist_sec,0)
+    sec_labels = np.argmax(dist_sec,0)
     max_values = np.squeeze(max_values)
 
     far_voxels = max_values<0.201

@@ -10,7 +10,7 @@ import os
 import shutil
 from plot_utils import CNF_plots,image_CNF, calc_statistics, plot_prec_recall, plot_map_stat, plot_conf_mtrx_heat_map
 sys.path.append("/home/GIT_CHECK_20_JAN/SegmA_3A/python/plot_utils.py")
-from plot_utils import AA_dict
+from plot_utils import AA_dict, calc_detection_matrix
 
 
 
@@ -40,7 +40,8 @@ if __name__ == '__main__':
     conf_labels = np.argmax(conf_preds,0)
 
 
-    CNF_plots(em_mtrx, seg_true, seg_labels, conf_labels, dist_mtrx, plots_folder)
+#    CNF_plots(em_mtrx, seg_true, seg_labels, conf_labels, dist_mtrx, plots_folder)
+    CNF_plots(seg_true, seg_labels, conf_labels, dist_mtrx, plots_folder)
     RES = calc_statistics(em_mtrx,seg_labels,seg_true,conf_labels,bin_points,map_thr)
     plot_prec_recall(RES, plots_folder)
 
